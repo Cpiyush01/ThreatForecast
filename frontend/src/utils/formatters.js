@@ -1,28 +1,32 @@
-export const formatRiskScore = (val) => {
-  if (val === null || val === undefined || isNaN(val)) return '—';
+export function formatRisk(val) {
+  if (val == null || isNaN(val)) return '—';
+  return (val * 100).toFixed(1) + '%';
+}
+
+export function formatRiskDecimal(val) {
+  if (val == null || isNaN(val)) return '—';
   return Number(val).toFixed(4);
-};
+}
 
-export const formatNumber = (val) => {
-  if (val === null || val === undefined || isNaN(val)) return '—';
-  return Number(val).toLocaleString();
-};
-
-export const formatBytes = (bytes) => {
-  if (bytes === 0 || !bytes) return '0 Bytes';
+export function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
 
-export const formatTimestamp = (timestamp) => {
-  if (!timestamp) return '--:--:--';
-  const date = new Date(Number(timestamp) * 1000);
-  return date.toLocaleTimeString();
-};
+export function formatNumber(num) {
+  if (num == null || isNaN(num)) return '—';
+  return Number(num).toLocaleString();
+}
 
-export const formatPacketId = (id) => {
-  if (id === null || id === undefined) return '—';
-  return String(id).padStart(8, '0');
-};
+export function formatTimestamp(ts) {
+  if (!ts) return '--:--:--';
+  try {
+    const d = new Date(Number(ts) * 1000);
+    return d.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return '--:--:--';
+  }
+}
