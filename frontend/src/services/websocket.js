@@ -1,82 +1,119 @@
-import { wsUrl } from './api';
+/**
+ * WebSocket service for ThreatForecast real-time streaming (/ws/live)
+ */
+import { wsUrl } from '../api/api';
 
-class WebSocketService {
+class LiveWebSocketService {
   constructor() {
     this.ws = null;
-    this.listeners = new Set();
-    this.statusListeners = new Set();
+    this.listeners = {
+      packet: new Set(),
+      forecast: new Set(),
+      status: new Set(),
+    };
     this.state = 'disconnected';
-    this.shouldReconnect = true;
     this.reconnectTimer = null;
+    this.isStopped = false;
   }
 
   connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
-    this.shouldReconnect = true;
-    this._updateState('connecting');
+    this.isStopped = false;
+    this.updateState('connecting');
 
     try {
-      this.ws = new WebSocket(wsUrl());
+      const url = wsUrl();
+      this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
-        this._updateState('connected');
+        this.updateState('connected');
+        if (this.reconnectTimer) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
       };
 
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          this.listeners.forEach((listener) => listener(data));
+
+          if (data?.event_type === 'packet') {
+            this.emit('packet', data);
+          } else if (data?.event_type === 'forecast' || Array.isArray(data?.risk_scores)) {
+            this.emit('forecast', data);
+          }
         } catch {
-          // ignore malformed frame
+          // Ignore non-JSON or malformed frames
         }
       };
 
       this.ws.onerror = () => {
-        this._updateState('error');
+        this.updateState('error');
       };
 
       this.ws.onclose = () => {
-        this._updateState('disconnected');
-        if (this.shouldReconnect) {
-          this.reconnectTimer = setTimeout(() => this.connect(), 2500);
+        this.updateState('disconnected');
+        this.ws = null;
+        if (!this.isStopped) {
+          this.reconnectTimer = setTimeout(() => {
+            this.connect();
+          }, 2500);
         }
       };
-    } catch (e) {
-      this._updateState('error');
-      if (this.shouldReconnect) {
-        this.reconnectTimer = setTimeout(() => this.connect(), 2500);
-      }
+    } catch {
+      this.updateState('error');
     }
   }
 
   disconnect() {
-    this.shouldReconnect = false;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.isStopped = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-    this._updateState('disconnected');
+    this.updateState('disconnected');
   }
 
-  subscribe(callback) {
-    this.listeners.add(callback);
-    return () => this.listeners.delete(callback);
-  }
-
-  onStatusChange(callback) {
-    this.statusListeners.add(callback);
-    callback(this.state);
-    return () => this.statusListeners.delete(callback);
-  }
-
-  _updateState(newState) {
+  updateState(newState) {
     this.state = newState;
-    this.statusListeners.forEach((listener) => listener(newState));
+    this.emit('status', newState);
+  }
+
+  on(event, callback) {
+    if (this.listeners[event]) {
+      this.listeners[event].add(callback);
+      if (event === 'status') {
+        callback(this.state);
+      }
+    }
+    return () => this.off(event, callback);
+  }
+
+  off(event, callback) {
+    if (this.listeners[event]) {
+      this.listeners[event].delete(callback);
+    }
+  }
+
+  emit(event, data) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach((cb) => {
+        try {
+          cb(data);
+        } catch {
+          // Do not fail if a subscriber errors
+        }
+      });
+    }
   }
 }
 
-export const webSocketService = new WebSocketService();
+export const liveWsService = new LiveWebSocketService();
+export default liveWsService;

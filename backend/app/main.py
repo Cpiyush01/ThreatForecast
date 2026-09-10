@@ -763,7 +763,6 @@ def explain(req: ExplainReq):
 # ============================================================
 # WEBSOCKET
 # ============================================================
-
 @app.websocket("/ws/live")
 async def ws(
     websocket: WebSocket
@@ -771,11 +770,26 @@ async def ws(
 
     await websocket.accept()
 
+    print(
+        "[WS] FRONTEND CONNECTED",
+        flush=True
+    )
+
+    # Larger queue for high-volume packet traffic
     q = asyncio.Queue(
-        maxsize=20
+        maxsize=1000
     )
 
     runtime.subs.add(q)
+
+    print(
+        f"[WS] SUBSCRIBER COUNT: "
+        f"{len(runtime.subs)}",
+        flush=True
+    )
+
+    sent_packets = 0
+    sent_forecasts = 0
 
     try:
 
@@ -783,14 +797,62 @@ async def ws(
 
             item = await q.get()
 
+            event_type = item.get(
+                "event_type"
+            )
+
             await websocket.send_json(
                 item
             )
 
+            if event_type == "packet":
+
+                sent_packets += 1
+
+                if (
+                    sent_packets == 1
+                    or sent_packets % 100 == 0
+                ):
+
+                    print(
+                        f"[WS] PACKETS SENT: "
+                        f"{sent_packets}",
+                        flush=True
+                    )
+
+            elif event_type == "forecast":
+
+                sent_forecasts += 1
+
+                print(
+                    f"[WS] FORECAST SENT: "
+                    f"{sent_forecasts}",
+                    flush=True
+                )
+
     except WebSocketDisconnect:
 
-        pass
+        print(
+            "[WS] FRONTEND DISCONNECTED",
+            flush=True
+        )
+
+    except Exception as e:
+
+        print(
+            f"[WS ERROR] "
+            f"{type(e).__name__}: {e}",
+            flush=True
+        )
 
     finally:
 
-        runtime.subs.discard(q)
+        runtime.subs.discard(
+            q
+        )
+
+        print(
+            f"[WS] SUBSCRIBER REMOVED. "
+            f"REMAINING: {len(runtime.subs)}",
+            flush=True
+        )

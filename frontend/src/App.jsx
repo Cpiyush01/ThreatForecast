@@ -1,40 +1,40 @@
 import React from 'react';
-import { AppProvider, useApp } from './context/AppContext';
-import { ForecastProvider } from './context/ForecastContext';
-import { MonitoringProvider } from './context/MonitoringContext';
-import AppLayout from './components/layout/AppLayout';
-import CommandCenterPage from './pages/CommandCenterPage';
-import LiveMonitorPage from './pages/LiveMonitorPage';
-import IntelligencePage from './pages/IntelligencePage';
+import { ThreatProvider, useThreat } from './context/ThreatContext';
+import AppShell from './components/layout/AppShell';
 
-function AppContent() {
-  const { activePage } = useApp();
+import Dashboard from './pages/Dashboard';
+import LiveMonitor from './pages/LiveMonitor';
+import NetworkStatePage from './pages/NetworkStatePage';
+import ForecastPage from './pages/ForecastPage';
+import MitrePage from './pages/MitrePage';
+import ExplainPage from './pages/ExplainPage';
 
-  return (
-    <AppLayout>
-      {activePage === 'command-center' || activePage === 'dashboard' ? (
-        <CommandCenterPage />
-      ) : activePage === 'live-monitor' ? (
-        <LiveMonitorPage />
-      ) : activePage === 'intelligence' ? (
-        <IntelligencePage />
-      ) : (
-        <CommandCenterPage />
-      )}
-    </AppLayout>
-  );
+function WorkspaceRouter() {
+  const { activeTab } = useThreat();
+
+  switch (activeTab) {
+    case 'live':
+      return <LiveMonitor />;
+    case 'network':
+      return <NetworkStatePage />;
+    case 'forecast':
+      return <ForecastPage />;
+    case 'mitre':
+      return <MitrePage />;
+    case 'explain':
+      return <ExplainPage />;
+    case 'dashboard':
+    default:
+      return <Dashboard />;
+  }
 }
 
-export function App() {
+export default function App() {
   return (
-    <AppProvider>
-      <ForecastProvider>
-        <MonitoringProvider>
-          <AppContent />
-        </MonitoringProvider>
-      </ForecastProvider>
-    </AppProvider>
+    <ThreatProvider>
+      <AppShell>
+        <WorkspaceRouter />
+      </AppShell>
+    </ThreatProvider>
   );
 }
-
-export default App;
